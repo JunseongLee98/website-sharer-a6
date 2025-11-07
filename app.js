@@ -23,29 +23,36 @@ app.use(session({
     }
 }));
 
-// Azure AD Authentication configuration
-const appSettings = {
-    appCredentials: {
-        clientId: process.env.CLIENT_ID || '',
-        tenantId: process.env.TENANT_ID || '',
-        clientSecret: process.env.CLIENT_SECRET || ''
-    },
-    authRoutes: {
-        redirect: process.env.REDIRECT_URI || `/redirect`,
-        unauthorized: "/unauthorized",
-        frontChannelLogout: "/sso_logout"
-    },
-    protectedResources: {
-        graphAPI: {
-            endpoint: "https://graph.microsoft.com/v1.0/me",
-            scopes: ["User.Read"]
+// Azure AD Authentication configuration (optional)
+// Only initialize if all required environment variables are set
+let msid = null;
+if (process.env.CLIENT_ID && process.env.TENANT_ID && process.env.CLIENT_SECRET) {
+    const appSettings = {
+        appCredentials: {
+            clientId: process.env.CLIENT_ID,
+            tenantId: process.env.TENANT_ID,
+            clientSecret: process.env.CLIENT_SECRET
+        },
+        authRoutes: {
+            redirect: process.env.REDIRECT_URI || `/redirect`,
+            unauthorized: "/unauthorized",
+            frontChannelLogout: "/sso_logout"
+        },
+        protectedResources: {
+            graphAPI: {
+                endpoint: "https://graph.microsoft.com/v1.0/me",
+                scopes: ["User.Read"]
+            }
         }
-    }
-};
+    };
 
-// Initialize Azure AD authentication
-const msid = new MsIdExpress.WebAppAuthClientBuilder(appSettings).build();
-app.use(msid.initialize());
+    // Initialize Azure AD authentication
+    msid = new MsIdExpress.WebAppAuthClientBuilder(appSettings).build();
+    app.use(msid.initialize());
+    console.log('Azure AD authentication initialized');
+} else {
+    console.warn('Azure AD authentication not configured. CLIENT_ID, TENANT_ID, and CLIENT_SECRET environment variables are required.');
+}
 
 // Middleware
 app.use(express.json());
@@ -88,18 +95,29 @@ try {
     console.error('Failed to load API v3 routes:', error);
 }
 
-// Authentication routes
-app.get('/signin',
-    msid.signIn({
-        postLoginRedirect: "/",
-    }),
-);
+// Authentication routes (only if Azure AD is configured)
+if (msid) {
+    app.get('/signin',
+        msid.signIn({
+            postLoginRedirect: "/",
+        }),
+    );
 
-app.get('/signout',
-    msid.signOut({
-        postLogoutRedirect: "/",
-    }),
-);
+    app.get('/signout',
+        msid.signOut({
+            postLogoutRedirect: "/",
+        }),
+    );
+} else {
+    // Placeholder routes if Azure AD is not configured
+    app.get('/signin', (req, res) => {
+        res.status(503).send('Azure AD authentication is not configured. Please set CLIENT_ID, TENANT_ID, and CLIENT_SECRET environment variables.');
+    });
+
+    app.get('/signout', (req, res) => {
+        res.redirect('/');
+    });
+}
 
 // Unauthorized route
 app.get('/unauthorized', (req, res) => {
