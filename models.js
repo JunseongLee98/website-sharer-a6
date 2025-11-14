@@ -109,22 +109,52 @@ const postSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    created_date: {
-        type: Date,
-        default: Date.now
-    },
     username: {
         type: String,
         required: true
+    },
+    likes: {
+        type: [String],
+        default: []
+    },
+    created_date: {
+        type: Date,
+        default: Date.now
+    }
+});
+
+// Define Comment schema
+const commentSchema = new mongoose.Schema({
+    username: {
+        type: String,
+        required: true
+    },
+    comment: {
+        type: String,
+        required: true
+    },
+    post: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Post',
+        required: true
+    },
+    created_date: {
+        type: Date,
+        default: Date.now
     }
 });
 
 // Create Post model
 const Post = mongoose.model('Post', postSchema);
 
+// Create Comment model
+const Comment = mongoose.model('Comment', commentSchema);
+
 // Export models object
 const models = {
-    Post: Post
+    Post: Post,
+    Comment: Comment
 };
 
 export default models;
+

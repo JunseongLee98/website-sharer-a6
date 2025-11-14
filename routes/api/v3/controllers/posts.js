@@ -126,16 +126,22 @@ router.get('/', async (req, res) => {
                 try{
                     const htmlPreview = await getURLPreview(post.url);
                     return {
+                        id: post._id.toString(),
+                        url: post.url,
                         description: post.description,
                         htmlPreview: htmlPreview,
                         username: post.username,
+                        likes: post.likes || [],
                         created_date: post.created_date
                     };
                 }catch(error){
                     return {
+                        id: post._id.toString(),
+                        url: post.url,
                         description: post.description,
                         htmlPreview: `Error generating preview: ${error.message}`,
                         username: post.username,
+                        likes: post.likes || [],
                         created_date: post.created_date
                     };
                 }
@@ -150,6 +156,231 @@ router.get('/', async (req, res) => {
         res.status(500).json({
             status: "error",
             error: error.message
+        });
+    }
+});
+
+// Helper function to get username from session
+function getUsername(session) {
+    const account = session.account;
+    if (!account) return null;
+    const idTokenClaims = account.idTokenClaims || {};
+    return account.username || 
+           idTokenClaims.preferred_username || 
+           idTokenClaims.email || 
+           idTokenClaims.upn || 
+           account.localAccountId || 
+           null;
+}
+
+// POST /api/v3/posts/like
+router.post('/like', async (req, res) => {
+    try {
+        const session = req.session;
+        
+        // Check if user is logged in
+        if (!session.isAuthenticated || !session.account) {
+            return res.status(401).json({
+                status: "error",
+                error: "not logged in"
+            });
+        }
+
+        const username = getUsername(session);
+        if (!username) {
+            return res.status(401).json({
+                status: "error",
+                error: "not logged in"
+            });
+        }
+
+        const { postID } = req.body;
+        
+        if (!postID) {
+            return res.status(400).json({
+                status: "error",
+                error: "postID is required"
+            });
+        }
+
+        // Wait for MongoDB connection
+        try {
+            await waitForConnection();
+        } catch (connectionError) {
+            console.error('MongoDB connection error:', connectionError);
+            return res.status(500).json({
+                status: "error",
+                error: "Database connection failed"
+            });
+        }
+
+        // Find the Post
+        const post = await req.models.Post.findById(postID);
+        if (!post) {
+            return res.status(404).json({
+                status: "error",
+                error: "Post not found"
+            });
+        }
+
+        // If the post's likes don't include the username, add it
+        if (!post.likes || !post.likes.includes(username)) {
+            if (!post.likes) {
+                post.likes = [];
+            }
+            post.likes.push(username);
+            await post.save();
+        }
+
+        return res.json({ status: "success" });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({
+            status: "error",
+            error: error.message || error.toString()
+        });
+    }
+});
+
+// POST /api/v3/posts/unlike
+router.post('/unlike', async (req, res) => {
+    try {
+        const session = req.session;
+        
+        // Check if user is logged in
+        if (!session.isAuthenticated || !session.account) {
+            return res.status(401).json({
+                status: "error",
+                error: "not logged in"
+            });
+        }
+
+        const username = getUsername(session);
+        if (!username) {
+            return res.status(401).json({
+                status: "error",
+                error: "not logged in"
+            });
+        }
+
+        const { postID } = req.body;
+        
+        if (!postID) {
+            return res.status(400).json({
+                status: "error",
+                error: "postID is required"
+            });
+        }
+
+        // Wait for MongoDB connection
+        try {
+            await waitForConnection();
+        } catch (connectionError) {
+            console.error('MongoDB connection error:', connectionError);
+            return res.status(500).json({
+                status: "error",
+                error: "Database connection failed"
+            });
+        }
+
+        // Find the Post
+        const post = await req.models.Post.findById(postID);
+        if (!post) {
+            return res.status(404).json({
+                status: "error",
+                error: "Post not found"
+            });
+        }
+
+        // If the post's likes include the username, remove it
+        if (post.likes && post.likes.includes(username)) {
+            post.likes = post.likes.filter(like => like !== username);
+            await post.save();
+        }
+
+        return res.json({ status: "success" });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({
+            status: "error",
+            error: error.message || error.toString()
+        });
+    }
+});
+
+// DELETE /api/v3/posts
+router.delete('/', async (req, res) => {
+    try {
+        const session = req.session;
+        
+        // Check if user is logged in
+        if (!session.isAuthenticated || !session.account) {
+            return res.status(401).json({
+                status: "error",
+                error: "not logged in"
+            });
+        }
+
+        const username = getUsername(session);
+        if (!username) {
+            return res.status(401).json({
+                status: "error",
+                error: "not logged in"
+            });
+        }
+
+        const { postID } = req.body;
+        
+        if (!postID) {
+            return res.status(400).json({
+                status: "error",
+                error: "postID is required"
+            });
+        }
+
+        // Wait for MongoDB connection
+        try {
+            await waitForConnection();
+        } catch (connectionError) {
+            console.error('MongoDB connection error:', connectionError);
+            return res.status(500).json({
+                status: "error",
+                error: "Database connection failed"
+            });
+        }
+
+        // Find the Post
+        const post = await req.models.Post.findById(postID);
+        if (!post) {
+            return res.status(404).json({
+                status: "error",
+                error: "Post not found"
+            });
+        }
+
+        // Check if the username of the post matches the logged in username
+        if (post.username !== username) {
+            return res.status(401).json({
+                status: "error",
+                error: "you can only delete your own posts"
+            });
+        }
+
+        // Delete all comments that refer to this Post
+        await req.models.Comment.deleteMany({ post: postID });
+
+        // Delete the Post
+        await req.models.Post.deleteOne({ _id: postID });
+
+        return res.json({ status: "success" });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({
+            status: "error",
+            error: error.message || error.toString()
         });
     }
 });

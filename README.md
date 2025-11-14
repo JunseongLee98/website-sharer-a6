@@ -149,3 +149,50 @@ The application is deployed on Render.com (or Azure) with MongoDB Atlas for the 
 - `GET /signin` - Sign in with Azure AD
 - `GET /signout` - Sign out and clear session
 - `GET /unauthorized` - Unauthorized access page
+
+## A6
+
+### Deployed Website
+- URL: [To be added after deployment]
+
+### What Changed in A6
+- Added likes functionality: users can like and unlike posts
+- Added comments functionality: users can view and post comments on posts
+- Added delete functionality: users can delete their own posts
+- Modified Post schema to include `likes` array field
+- Created Comment schema/model with username, comment, post reference, and created_date
+- Updated GET /api/v3/posts to return all fields including `id` (from `_id`) and `likes`
+- Added POST /api/v3/posts/like endpoint to like a post
+- Added POST /api/v3/posts/unlike endpoint to unlike a post
+- Added DELETE /api/v3/posts endpoint to delete posts (only creator can delete)
+- Created comments.js controller with:
+  - GET /api/v3/comments?postID=<id> - Get all comments for a post
+  - POST /api/v3/comments - Post a new comment (requires authentication)
+- Updated client UI to show likes count, like/unlike buttons, comments section, and delete buttons
+
+### A6 API Endpoints
+
+#### Posts Endpoints
+- `GET /api/v3/posts` - Get all posts (now includes `id`, `url`, `description`, `username`, `likes`, `created_date`, `htmlPreview`)
+- `POST /api/v3/posts/like` - Like a post (requires authentication, postID in body)
+- `POST /api/v3/posts/unlike` - Unlike a post (requires authentication, postID in body)
+- `DELETE /api/v3/posts` - Delete a post (requires authentication, only creator can delete, postID in body)
+
+#### Comments Endpoints
+- `GET /api/v3/comments?postID=<id>` - Get all comments for a specific post
+- `POST /api/v3/comments` - Create a new comment (requires authentication, postID and newComment in body)
+
+### Database Schema Changes
+
+#### Post Schema
+- `url` (String, required)
+- `description` (String, required)
+- `username` (String, required)
+- `likes` (Array of Strings, default: [])
+- `created_date` (Date, default: Date.now)
+
+#### Comment Schema
+- `username` (String, required)
+- `comment` (String, required)
+- `post` (ObjectId reference to Post, required)
+- `created_date` (Date, default: Date.now)
