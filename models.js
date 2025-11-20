@@ -144,16 +144,49 @@ const commentSchema = new mongoose.Schema({
     }
 });
 
+// Define UserInfo schema
+const userInfoSchema = new mongoose.Schema({
+    username: {
+        type: String,
+        required: true,
+        unique: true
+    },
+    bio: {
+        type: String,
+        default: ''
+    },
+    favoriteColor: {
+        type: String,
+        default: ''
+    },
+    website: {
+        type: String,
+        default: ''
+    },
+    created_date: {
+        type: Date,
+        default: Date.now
+    },
+    updated_date: {
+        type: Date,
+        default: Date.now
+    }
+});
+
 // Create Post model
 const Post = mongoose.model('Post', postSchema);
 
 // Create Comment model
 const Comment = mongoose.model('Comment', commentSchema);
 
+// Create UserInfo model
+const UserInfo = mongoose.model('UserInfo', userInfoSchema);
+
 // Export models object
 const models = {
     Post: Post,
-    Comment: Comment
+    Comment: Comment,
+    UserInfo: UserInfo
 };
 
 export default models;

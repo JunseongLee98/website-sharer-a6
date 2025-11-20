@@ -196,3 +196,38 @@ The application is deployed on Render.com (or Azure) with MongoDB Atlas for the 
 - `comment` (String, required)
 - `post` (ObjectId reference to Post, required)
 - `created_date` (Date, default: Date.now)
+
+## A7
+
+### Deployed Website
+- URL: [To be added after deployment]
+
+### What Changed in A7
+- Added user information functionality: users can view and edit their profile information
+- Created UserInfo database schema and model with fields:
+  - `username` (unique identifier)
+  - `bio` (text description about the user)
+  - `favoriteColor` (user's favorite color)
+  - `website` (personal website URL)
+  - `created_date` and `updated_date` (timestamps)
+- Added endpoints for loading and saving user info:
+  - `GET /api/v3/users/info?username=<username>` - Get user information
+  - `PUT /api/v3/users/info` - Update user information (requires authentication, can only update own info)
+- Updated userInfo.html to display user information and provide edit form for own profile
+- Implemented client-side functions to load and save user info via AJAX calls
+
+### A7 API Endpoints
+
+#### User Info Endpoints
+- `GET /api/v3/users/info?username=<username>` - Get user information (returns default values if user info doesn't exist)
+- `PUT /api/v3/users/info` - Update user information (requires authentication, only can update own info)
+
+### Database Schema Changes
+
+#### UserInfo Schema
+- `username` (String, required, unique)
+- `bio` (String, default: '')
+- `favoriteColor` (String, default: '')
+- `website` (String, default: '')
+- `created_date` (Date, default: Date.now)
+- `updated_date` (Date, default: Date.now)

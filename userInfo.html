@@ -20,6 +20,35 @@
   
   <h2>Info for user: <span id="username-span"></span></h2>
 
+  <div id="user_info_display">
+    <h3>User Information</h3>
+    <div id="user_info_content">
+      <p><strong>Bio:</strong> <span id="bio-display"></span></p>
+      <p><strong>Favorite Color:</strong> <span id="favoriteColor-display"></span></p>
+      <p><strong>Website:</strong> <a id="website-display" href="" target="_blank"></a></p>
+    </div>
+  </div>
+
+  <div id="user_info_new_div" class="d-none">
+    <h3>Edit Your Information</h3>
+    <form id="user_info_form">
+      <div class="mb-3">
+        <label for="bio-input" class="form-label">Bio:</label>
+        <textarea class="form-control" id="bio-input" rows="3" placeholder="Tell us about yourself..."></textarea>
+      </div>
+      <div class="mb-3">
+        <label for="favoriteColor-input" class="form-label">Favorite Color:</label>
+        <input type="text" class="form-control" id="favoriteColor-input" placeholder="e.g., Blue, Red, #FF5733">
+      </div>
+      <div class="mb-3">
+        <label for="website-input" class="form-label">Personal Website:</label>
+        <input type="url" class="form-control" id="website-input" placeholder="https://example.com">
+      </div>
+      <button type="button" class="btn btn-primary" onclick="saveUserInfo()">Save Information</button>
+      <span id="save-status"></span>
+    </form>
+  </div>
+
   <h2>All Posts</h2>
   <button onclick="loadUserInfo()">refresh</button>
   <div id="posts_box"></div>
