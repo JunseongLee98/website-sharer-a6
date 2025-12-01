@@ -34,9 +34,18 @@ if (process.env.CLIENT_ID && process.env.TENANT_ID && process.env.CLIENT_SECRET)
     if (!redirectUri) {
         // Auto-detect based on environment
         if (process.env.RENDER_EXTERNAL_URL) {
-            // Render deployment - use HTTPS
-            redirectUri = `${process.env.RENDER_EXTERNAL_URL}/redirect`;
-            console.log(`Using Render redirect URI: ${redirectUri}`);
+            // Render deployment - FORCE HTTPS (Render provides HTTP URL but we need HTTPS)
+            let renderUrl = process.env.RENDER_EXTERNAL_URL;
+            // Replace http:// with https:// to ensure secure redirect
+            renderUrl = renderUrl.replace(/^http:\/\//i, 'https://');
+            redirectUri = `${renderUrl}/redirect`;
+            console.log(`Using Render redirect URI (forced HTTPS): ${redirectUri}`);
+        } else if (process.env.RENDER) {
+            // Fallback for Render if RENDER_EXTERNAL_URL is not available
+            // Construct from RENDER_SERVICE_NAME or use environment detection
+            const serviceName = process.env.RENDER_SERVICE_NAME || 'website-sharer-a6';
+            redirectUri = `https://${serviceName}.onrender.com/redirect`;
+            console.log(`Using Render redirect URI (constructed): ${redirectUri}`);
         } else if (process.env.WEBSITE_HOSTNAME) {
             // Azure App Service deployment - use HTTPS
             redirectUri = `https://${process.env.WEBSITE_HOSTNAME}/redirect`;
