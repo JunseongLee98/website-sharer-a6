@@ -33,30 +33,44 @@ if (process.env.CLIENT_ID && process.env.TENANT_ID && process.env.CLIENT_SECRET)
 
     if (!redirectUri) {
         // Auto-detect based on environment
+        // IMPORTANT: Azure AD requires an absolute URL, not a relative path
+
         if (process.env.RENDER_EXTERNAL_URL) {
             // Render deployment - FORCE HTTPS (Render provides HTTP URL but we need HTTPS)
             let renderUrl = process.env.RENDER_EXTERNAL_URL;
             // Replace http:// with https:// to ensure secure redirect
             renderUrl = renderUrl.replace(/^http:\/\//i, 'https://');
             redirectUri = `${renderUrl}/redirect`;
-            console.log(`Using Render redirect URI (forced HTTPS): ${redirectUri}`);
-        } else if (process.env.RENDER) {
+            console.log(`✓ Using Render redirect URI (forced HTTPS): ${redirectUri}`);
+        } else if (process.env.RENDER || process.env.RENDER_SERVICE_NAME) {
             // Fallback for Render if RENDER_EXTERNAL_URL is not available
-            // Construct from RENDER_SERVICE_NAME or use environment detection
+            // Construct from RENDER_SERVICE_NAME or use default
             const serviceName = process.env.RENDER_SERVICE_NAME || 'website-sharer-a6';
             redirectUri = `https://${serviceName}.onrender.com/redirect`;
-            console.log(`Using Render redirect URI (constructed): ${redirectUri}`);
+            console.log(`✓ Using Render redirect URI (constructed from service name): ${redirectUri}`);
         } else if (process.env.WEBSITE_HOSTNAME) {
             // Azure App Service deployment - use HTTPS
             redirectUri = `https://${process.env.WEBSITE_HOSTNAME}/redirect`;
-            console.log(`Using Azure redirect URI: ${redirectUri}`);
+            console.log(`✓ Using Azure App Service redirect URI: ${redirectUri}`);
+        } else if (process.env.NODE_ENV === 'production') {
+            // Production but can't detect platform - ERROR OUT
+            console.error('❌ ERROR: Cannot determine redirect URI. Please set REDIRECT_URI environment variable.');
+            console.error('   Example: REDIRECT_URI=https://your-app.onrender.com/redirect');
+            throw new Error('REDIRECT_URI environment variable must be set in production');
         } else {
-            // Local development or fallback
+            // Local development only - use relative path
             redirectUri = `/redirect`;
-            console.log(`Using local redirect URI: ${redirectUri}`);
+            console.log(`⚠ Using local redirect URI (development only): ${redirectUri}`);
         }
     } else {
-        console.log(`Using configured redirect URI: ${redirectUri}`);
+        console.log(`✓ Using configured redirect URI: ${redirectUri}`);
+    }
+
+    // Validate that redirect URI is an absolute URL (except in development)
+    if (process.env.NODE_ENV === 'production' && !redirectUri.startsWith('https://')) {
+        console.error(`❌ ERROR: Invalid redirect URI: ${redirectUri}`);
+        console.error('   Azure AD requires HTTPS absolute URL (e.g., https://your-app.onrender.com/redirect)');
+        throw new Error('Redirect URI must be an absolute HTTPS URL in production');
     }
 
     const appSettings = {
