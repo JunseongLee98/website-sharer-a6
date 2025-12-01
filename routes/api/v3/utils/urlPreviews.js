@@ -31,21 +31,46 @@ function sanitizeHTML(html) {
     return html;
 }
 
+// Simple in-memory cache with timestamps to reduce API calls
+const previewCache = new Map();
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour
+
+// Rate limiting: track last request time to prevent too many requests
+let lastRequestTime = 0;
+const MIN_REQUEST_INTERVAL = 500; // Minimum 500ms between requests
+
 async function getURLPreview(url){
     try {
+        // Check cache first
+        const cached = previewCache.get(url);
+        if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
+            console.log(`Returning cached preview for ${url}`);
+            return cached.html;
+        }
+
+        // Rate limiting: ensure minimum interval between requests
+        const now = Date.now();
+        const timeSinceLastRequest = now - lastRequestTime;
+        if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+            const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+            console.log(`Rate limiting: waiting ${waitTime}ms before fetching ${url}`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+        lastRequestTime = Date.now();
+
         // Fetch the webpage content with User-Agent header to avoid being blocked
         // Add retry logic for rate limiting (429 errors)
         let response;
-        let retries = 3;
-        let delay = 1000; // Start with 1 second delay
-        
-        while (retries > 0) {
+        let retries = 2; // Reduced from 3 to 2 to avoid hammering servers
+        let delay = 2000; // Increased from 1000ms to 2000ms initial delay
+
+        while (retries >= 0) {
             try {
                 // Create a timeout promise for node-fetch v2
                 const timeoutPromise = new Promise((_, reject) => {
-                    setTimeout(() => reject(new Error('Request timeout')), 10000);
+                    setTimeout(() => reject(new Error('Request timeout')), 15000); // Increased to 15 seconds
                 });
-                
+
                 response = await Promise.race([
                     fetch(url, {
                         headers: {
@@ -54,38 +79,40 @@ async function getURLPreview(url){
                     }),
                     timeoutPromise
                 ]);
-                
+
                 // If we get a 429 (Too Many Requests), wait and retry
                 if (response.status === 429) {
                     retries--;
-                    if (retries > 0) {
-                        console.log(`Rate limited (429) for ${url}, retrying in ${delay}ms...`);
-                        await new Promise(resolve => setTimeout(resolve, delay));
+                    if (retries >= 0) {
+                        const retryAfter = response.headers.get('Retry-After');
+                        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : delay;
+                        console.log(`Rate limited (429) for ${url}, retrying in ${waitTime}ms... (${retries} retries left)`);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
                         delay *= 2; // Exponential backoff
                         continue;
                     } else {
-                        throw new Error(`HTTP error! status: 429 (Too Many Requests). The website is rate-limiting requests. Please try again later.`);
+                        throw new Error(`The website is rate-limiting requests. Please wait a moment and try again.`);
                     }
                 }
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
-                
+
                 // Success, break out of retry loop
                 break;
             } catch (fetchError) {
                 // If it's a network error, timeout, or 429 and we have retries left, retry
                 const isRetryableError = retries > 0 && (
-                    fetchError.code === 'ECONNRESET' || 
-                    fetchError.code === 'ETIMEDOUT' || 
+                    fetchError.code === 'ECONNRESET' ||
+                    fetchError.code === 'ETIMEDOUT' ||
                     fetchError.message === 'Request timeout' ||
                     (fetchError.message && fetchError.message.includes('429'))
                 );
-                
+
                 if (isRetryableError) {
                     retries--;
-                    console.log(`Network/timeout error for ${url}, retrying in ${delay}ms...`);
+                    console.log(`Network/timeout error for ${url}, retrying in ${delay}ms... (${retries} retries left)`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                     delay *= 2;
                     continue;
@@ -189,6 +216,12 @@ async function getURLPreview(url){
         }
 
         previewHTML += `</div>`;
+
+        // Cache the result
+        previewCache.set(url, {
+            html: previewHTML,
+            timestamp: Date.now()
+        });
 
         return previewHTML;
 

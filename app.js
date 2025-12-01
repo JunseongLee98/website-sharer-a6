@@ -27,6 +27,29 @@ app.use(session({
 // Only initialize if all required environment variables are set
 let msid = null;
 if (process.env.CLIENT_ID && process.env.TENANT_ID && process.env.CLIENT_SECRET) {
+    // Build the correct redirect URI
+    // In production (Render, Azure, etc.), use the environment variable or construct from host
+    let redirectUri = process.env.REDIRECT_URI;
+
+    if (!redirectUri) {
+        // Auto-detect based on environment
+        if (process.env.RENDER_EXTERNAL_URL) {
+            // Render deployment - use HTTPS
+            redirectUri = `${process.env.RENDER_EXTERNAL_URL}/redirect`;
+            console.log(`Using Render redirect URI: ${redirectUri}`);
+        } else if (process.env.WEBSITE_HOSTNAME) {
+            // Azure App Service deployment - use HTTPS
+            redirectUri = `https://${process.env.WEBSITE_HOSTNAME}/redirect`;
+            console.log(`Using Azure redirect URI: ${redirectUri}`);
+        } else {
+            // Local development or fallback
+            redirectUri = `/redirect`;
+            console.log(`Using local redirect URI: ${redirectUri}`);
+        }
+    } else {
+        console.log(`Using configured redirect URI: ${redirectUri}`);
+    }
+
     const appSettings = {
         appCredentials: {
             clientId: process.env.CLIENT_ID,
@@ -34,7 +57,7 @@ if (process.env.CLIENT_ID && process.env.TENANT_ID && process.env.CLIENT_SECRET)
             clientSecret: process.env.CLIENT_SECRET
         },
         authRoutes: {
-            redirect: process.env.REDIRECT_URI || `/redirect`,
+            redirect: redirectUri,
             unauthorized: "/unauthorized",
             frontChannelLogout: "/sso_logout"
         },
@@ -49,7 +72,7 @@ if (process.env.CLIENT_ID && process.env.TENANT_ID && process.env.CLIENT_SECRET)
     // Initialize Azure AD authentication
     msid = new MsIdExpress.WebAppAuthClientBuilder(appSettings).build();
     app.use(msid.initialize());
-    console.log('Azure AD authentication initialized');
+    console.log('Azure AD authentication initialized successfully');
 } else {
     console.warn('Azure AD authentication not configured. CLIENT_ID, TENANT_ID, and CLIENT_SECRET environment variables are required.');
 }
