@@ -10,12 +10,13 @@ AADSTS50011: The redirect URI 'http://website-sharer-a6.onrender.com/redirect' s
 ```
 
 ### Root Cause:
-The application was using HTTP instead of HTTPS for the redirect URI, or the redirect URI wasn't properly configured in Azure AD.
+Render's `RENDER_EXTERNAL_URL` environment variable provides an HTTP URL (e.g., `http://website-sharer-a6.onrender.com`), but Azure AD requires HTTPS redirect URIs for security. The application was using this HTTP URL directly, causing a mismatch.
 
 ### Solution (Automated):
-The application now **automatically detects** the correct redirect URI when deployed on Render:
-- It uses the `RENDER_EXTERNAL_URL` environment variable (automatically provided by Render)
-- It constructs the proper HTTPS URL: `https://website-sharer-a6.onrender.com/redirect`
+The application now **automatically fixes** the redirect URI when deployed on Render:
+- It detects the `RENDER_EXTERNAL_URL` environment variable (automatically provided by Render)
+- It **forces HTTPS** by replacing `http://` with `https://` in the URL
+- Result: `https://website-sharer-a6.onrender.com/redirect` (secure)
 
 ### What You Need to Do:
 
