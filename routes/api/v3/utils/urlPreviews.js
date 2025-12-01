@@ -1,6 +1,19 @@
 import fetch from 'node-fetch';
 import parser from 'node-html-parser';
 
+// Function to escape HTML to prevent XSS attacks
+function escapeHTML(text) {
+    if (!text) return '';
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+
 // Function to sanitize HTML content to prevent XSS attacks
 function sanitizeHTML(html) {
     // Remove script tags and their content
@@ -20,11 +33,65 @@ function sanitizeHTML(html) {
 
 async function getURLPreview(url){
     try {
-        // Fetch the webpage content
-        const response = await fetch(url);
+        // Fetch the webpage content with User-Agent header to avoid being blocked
+        // Add retry logic for rate limiting (429 errors)
+        let response;
+        let retries = 3;
+        let delay = 1000; // Start with 1 second delay
         
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+        while (retries > 0) {
+            try {
+                // Create a timeout promise for node-fetch v2
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Request timeout')), 10000);
+                });
+                
+                response = await Promise.race([
+                    fetch(url, {
+                        headers: {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                        }
+                    }),
+                    timeoutPromise
+                ]);
+                
+                // If we get a 429 (Too Many Requests), wait and retry
+                if (response.status === 429) {
+                    retries--;
+                    if (retries > 0) {
+                        console.log(`Rate limited (429) for ${url}, retrying in ${delay}ms...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        delay *= 2; // Exponential backoff
+                        continue;
+                    } else {
+                        throw new Error(`HTTP error! status: 429 (Too Many Requests). The website is rate-limiting requests. Please try again later.`);
+                    }
+                }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                // Success, break out of retry loop
+                break;
+            } catch (fetchError) {
+                // If it's a network error, timeout, or 429 and we have retries left, retry
+                const isRetryableError = retries > 0 && (
+                    fetchError.code === 'ECONNRESET' || 
+                    fetchError.code === 'ETIMEDOUT' || 
+                    fetchError.message === 'Request timeout' ||
+                    (fetchError.message && fetchError.message.includes('429'))
+                );
+                
+                if (isRetryableError) {
+                    retries--;
+                    console.log(`Network/timeout error for ${url}, retrying in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2;
+                    continue;
+                }
+                throw fetchError;
+            }
         }
 
         const html = await response.text();
@@ -127,7 +194,18 @@ async function getURLPreview(url){
 
     } catch (error) {
         console.error('Error fetching URL preview:', error);
-        return `<div style="max-width: 320px; border: solid 2px #dc3545; padding: 15px; text-align: center; border-radius: 12px; background: #f8d7da; color: #721c24; margin: 10px auto;">Error: ${error.message}</div>`;
+        let errorMessage = error.message;
+        
+        // Provide user-friendly error messages
+        if (errorMessage.includes('429')) {
+            errorMessage = 'Rate limited: Too many requests. Please try again in a few moments.';
+        } else if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
+            errorMessage = 'Request timed out. The website may be slow or unavailable.';
+        } else if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ENOTFOUND')) {
+            errorMessage = 'Unable to connect to the website. Please check the URL.';
+        }
+        
+        return `<div style="max-width: 320px; border: solid 2px #dc3545; padding: 15px; text-align: center; border-radius: 12px; background: #f8d7da; color: #721c24; margin: 10px auto;">Error: ${escapeHTML(errorMessage)}</div>`;
     }
 }
 
