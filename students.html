@@ -70,10 +70,42 @@
 
     <hr>
 
-    <!-- Add Student Section -->
+    <!-- Import from CSV Section -->
     <div class="card mb-4">
       <div class="card-header">
-        <h3>Add New Student</h3>
+        <h3>Import Students from CSV File</h3>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info">
+          <strong>CSV Format:</strong> Upload a CSV file with columns: name, classYear, email (optional), studentId (optional)
+          <br>
+          <strong>Example:</strong> <code>name,classYear,email,studentId</code>
+          <br>
+          <small>Class year must be: freshman, sophomore, junior, or senior</small>
+          <br>
+          <a href="#" onclick="downloadSampleCSV(); return false;" class="btn btn-sm btn-outline-primary mt-2">Download Sample CSV</a>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label for="csvFileInput" class="form-label">Select CSV File</label>
+            <input type="file" class="form-control" id="csvFileInput" accept=".csv" onchange="handleCSVFileSelect(event)">
+          </div>
+          <div class="col-md-4 d-flex align-items-end">
+            <button class="btn btn-success w-100" onclick="importStudentsFromCSV()" id="importBtn" disabled>Import Students</button>
+          </div>
+        </div>
+        <div id="csvPreview" class="mt-3 d-none">
+          <h5>Preview:</h5>
+          <div id="csvPreviewContent" class="border p-3 bg-light" style="max-height: 200px; overflow-y: auto;"></div>
+          <small class="text-muted" id="csvPreviewCount"></small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Student Manually Section -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h3>Add Student Manually (Optional)</h3>
       </div>
       <div class="card-body">
         <div class="row g-3">

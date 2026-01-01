@@ -51,7 +51,38 @@ This ensures balanced class year distribution instead of random grouping that co
 1. Navigate to `/students.html` in your browser
 2. Or click "Student Grouping" in the navigation menu
 
-### Add Students
+### Import Students from CSV File (Recommended)
+
+The fastest way to add multiple students is by importing a CSV file:
+
+1. **Prepare your CSV file** with the following format:
+   ```csv
+   name,classYear,email,studentId
+   John Doe,freshman,john.doe@example.com,12345
+   Jane Smith,sophomore,jane.smith@example.com,12346
+   ```
+
+2. **Required columns:**
+   - `name` - Student's full name (required)
+   - `classYear` - Must be one of: `freshman`, `sophomore`, `junior`, or `senior` (required)
+
+3. **Optional columns:**
+   - `email` - Student's email address
+   - `studentId` - Student identification number
+
+4. **Download a sample CSV:**
+   - Click "Download Sample CSV" button on the page
+   - Or use the `students_sample.csv` file in the repository
+
+5. **Upload and import:**
+   - Select your CSV file
+   - Preview the students to be imported
+   - Click "Import Students"
+   - All students will be added to the database
+
+### Add Students Manually (Alternative)
+
+You can also add students one at a time:
 
 1. Fill in the student information:
    - **Name** (required): Student's full name
@@ -177,6 +208,44 @@ Create balanced groups
 }
 ```
 
+## CSV File Format
+
+### Required Format
+
+The CSV file must have a header row with the following columns:
+
+```csv
+name,classYear,email,studentId
+```
+
+### Column Specifications
+
+| Column | Required | Valid Values | Description |
+|--------|----------|--------------|-------------|
+| name | Yes | Any text | Student's full name |
+| classYear | Yes | `freshman`, `sophomore`, `junior`, `senior` | Student's class year (case-insensitive) |
+| email | No | Valid email | Student's email address |
+| studentId | No | Any text | Student identification number |
+
+### Example CSV File
+
+```csv
+name,classYear,email,studentId
+John Doe,freshman,john.doe@example.com,12345
+Jane Smith,sophomore,jane.smith@example.com,12346
+Bob Johnson,junior,bob.j@example.com,12347
+Alice Williams,senior,alice.w@example.com,12348
+```
+
+### CSV Validation
+
+The system will:
+- Validate that required columns (`name`, `classYear`) are present
+- Check that `classYear` values are valid (freshman, sophomore, junior, senior)
+- Skip empty rows
+- Show preview before importing
+- Report any errors during import
+
 ## Technical Implementation
 
 ### Files Added/Modified
@@ -188,9 +257,12 @@ Create balanced groups
 - `routes/api/v3/apiv3.js` - Registered students router
 
 **Frontend:**
-- `students.html` - Student grouping interface
-- `javascripts/students.js` - Client-side logic for student management
+- `students.html` - Student grouping interface with CSV upload
+- `javascripts/students.js` - Client-side logic with CSV parsing
 - `index.html` - Added navigation link
+
+**Sample Files:**
+- `students_sample.csv` - Example CSV file for reference
 
 ### Database Schema
 

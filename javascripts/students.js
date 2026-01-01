@@ -3,6 +3,9 @@
  * Handles the frontend logic for managing students and creating balanced groups
  */
 
+// Global variable to store parsed CSV data
+let parsedCSVData = null;
+
 // Initialize the page
 async function init() {
     console.log('Student Grouping page initialized');
@@ -291,4 +294,224 @@ function showSuccess(message) {
     setTimeout(() => {
         successDiv.classList.add('d-none');
     }, 3000);
+}
+
+// CSV Import Functions
+
+// Handle CSV file selection
+function handleCSVFileSelect(event) {
+    const file = event.target.files[0];
+
+    if (!file) {
+        return;
+    }
+
+    if (!file.name.endsWith('.csv')) {
+        showError('Please select a CSV file');
+        return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = function(e) {
+        const content = e.target.result;
+        try {
+            parsedCSVData = parseCSV(content);
+            displayCSVPreview(parsedCSVData);
+            document.getElementById('importBtn').disabled = false;
+        } catch (error) {
+            showError('Error parsing CSV: ' + error.message);
+            parsedCSVData = null;
+            document.getElementById('importBtn').disabled = true;
+        }
+    };
+
+    reader.onerror = function() {
+        showError('Error reading file');
+        parsedCSVData = null;
+        document.getElementById('importBtn').disabled = true;
+    };
+
+    reader.readAsText(file);
+}
+
+// Parse CSV content
+function parseCSV(content) {
+    const lines = content.split('\n').filter(line => line.trim());
+
+    if (lines.length < 2) {
+        throw new Error('CSV file must have at least a header row and one data row');
+    }
+
+    // Parse header
+    const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+    // Validate required columns
+    if (!header.includes('name') || !header.includes('classyear')) {
+        throw new Error('CSV must have "name" and "classYear" columns');
+    }
+
+    const nameIndex = header.indexOf('name');
+    const classYearIndex = header.indexOf('classyear');
+    const emailIndex = header.indexOf('email');
+    const studentIdIndex = header.indexOf('studentid');
+
+    // Parse data rows
+    const students = [];
+    const validYears = ['freshman', 'sophomore', 'junior', 'senior'];
+
+    for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+
+        if (values.length < 2) {
+            continue;
+        }
+
+        const name = values[nameIndex];
+        const classYear = values[classYearIndex]?.toLowerCase();
+
+        if (!name) {
+            throw new Error(`Row ${i + 1}: Name is required`);
+        }
+
+        if (!classYear || !validYears.includes(classYear)) {
+            throw new Error(`Row ${i + 1}: Invalid class year "${classYear}". Must be: freshman, sophomore, junior, or senior`);
+        }
+
+        const student = {
+            name,
+            classYear,
+            email: emailIndex >= 0 ? values[emailIndex] : '',
+            studentId: studentIdIndex >= 0 ? values[studentIdIndex] : ''
+        };
+
+        students.push(student);
+    }
+
+    if (students.length === 0) {
+        throw new Error('No valid student data found in CSV');
+    }
+
+    return students;
+}
+
+// Display CSV preview
+function displayCSVPreview(students) {
+    const previewDiv = document.getElementById('csvPreview');
+    const previewContent = document.getElementById('csvPreviewContent');
+    const previewCount = document.getElementById('csvPreviewCount');
+
+    previewDiv.classList.remove('d-none');
+
+    // Count by class year
+    const counts = {
+        freshman: 0,
+        sophomore: 0,
+        junior: 0,
+        senior: 0
+    };
+
+    students.forEach(student => {
+        counts[student.classYear] = (counts[student.classYear] || 0) + 1;
+    });
+
+    const previewHtml = students.slice(0, 10).map(student => `
+        <div class="mb-1">
+            <strong>${escapeHTML(student.name)}</strong> -
+            <span class="class-badge ${student.classYear}">${student.classYear.toUpperCase()}</span>
+            ${student.email ? `<small class="text-muted ms-2">${escapeHTML(student.email)}</small>` : ''}
+        </div>
+    `).join('');
+
+    previewContent.innerHTML = previewHtml;
+
+    if (students.length > 10) {
+        previewContent.innerHTML += '<div class="mt-2 text-muted">...and ' + (students.length - 10) + ' more</div>';
+    }
+
+    previewCount.textContent = `Total: ${students.length} students (Freshmen: ${counts.freshman}, Sophomores: ${counts.sophomore}, Juniors: ${counts.junior}, Seniors: ${counts.senior})`;
+}
+
+// Import students from parsed CSV data
+async function importStudentsFromCSV() {
+    if (!parsedCSVData || parsedCSVData.length === 0) {
+        showError('No CSV data to import');
+        return;
+    }
+
+    const importBtn = document.getElementById('importBtn');
+    importBtn.disabled = true;
+    importBtn.textContent = 'Importing...';
+
+    try {
+        let successCount = 0;
+        let failCount = 0;
+        const errors = [];
+
+        for (const student of parsedCSVData) {
+            try {
+                const response = await fetchJSON(`/api/${apiVersion}/students`, {
+                    method: 'POST',
+                    body: student
+                });
+
+                if (response.status === 'success') {
+                    successCount++;
+                } else {
+                    failCount++;
+                    errors.push(`${student.name}: ${response.error || 'Unknown error'}`);
+                }
+            } catch (error) {
+                failCount++;
+                errors.push(`${student.name}: ${error.message}`);
+            }
+        }
+
+        if (failCount > 0) {
+            showError(`Imported ${successCount} students, ${failCount} failed. Check console for details.`);
+            console.error('Import errors:', errors);
+        } else {
+            showSuccess(`Successfully imported ${successCount} students!`);
+        }
+
+        await loadStudents();
+
+        document.getElementById('csvFileInput').value = '';
+        document.getElementById('csvPreview').classList.add('d-none');
+        parsedCSVData = null;
+
+    } catch (error) {
+        console.error('Error importing students:', error);
+        showError('Error importing students. See console for details.');
+    } finally {
+        importBtn.disabled = false;
+        importBtn.textContent = 'Import Students';
+    }
+}
+
+// Download sample CSV file
+function downloadSampleCSV() {
+    const csvContent = `name,classYear,email,studentId
+John Doe,freshman,john.doe@example.com,12345
+Jane Smith,sophomore,jane.smith@example.com,12346
+Bob Johnson,junior,bob.j@example.com,12347
+Alice Williams,senior,alice.w@example.com,12348
+Charlie Brown,freshman,charlie.b@example.com,12349
+Diana Prince,sophomore,diana.p@example.com,12350
+Eve Davis,junior,eve.d@example.com,12351
+Frank Miller,senior,frank.m@example.com,12352`;
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'students_sample.csv');
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showSuccess('Sample CSV file downloaded!');
 }
