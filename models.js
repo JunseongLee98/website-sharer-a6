@@ -144,16 +144,45 @@ const commentSchema = new mongoose.Schema({
     }
 });
 
+// Define Student schema
+const studentSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true
+    },
+    email: {
+        type: String,
+        required: false
+    },
+    classYear: {
+        type: String,
+        required: true,
+        enum: ['freshman', 'sophomore', 'junior', 'senior']
+    },
+    studentId: {
+        type: String,
+        required: false
+    },
+    created_date: {
+        type: Date,
+        default: Date.now
+    }
+});
+
 // Create Post model
 const Post = mongoose.model('Post', postSchema);
 
 // Create Comment model
 const Comment = mongoose.model('Comment', commentSchema);
 
+// Create Student model
+const Student = mongoose.model('Student', studentSchema);
+
 // Export models object
 const models = {
     Post: Post,
-    Comment: Comment
+    Comment: Comment,
+    Student: Student
 };
 
 export default models;
